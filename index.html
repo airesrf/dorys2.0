@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v6.1 Assistente IA Offline (LiteRT Gemma-4)</title>
+    <title>v6.2 Assistente IA Offline (Gemma-4 LiteRT)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -16,54 +16,120 @@
             --status-err: #ff4d4d;
             --status-ok: #00e676;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-main); color: var(--text-main); padding: 20px; margin: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text-main); 
+            padding: 20px; 
+            margin: 0; 
+        }
         .container { max-width: 900px; margin: 0 auto; }
-        #status-bar { padding: 15px; margin-bottom: 15px; background: var(--bg-card); border-left: 6px solid var(--status-warn); font-weight: bold; color: var(--status-warn); border-radius: 4px; transition: all 0.2s ease; }
-        .panel { background: var(--bg-card); border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; margin-bottom: 15px; }
-        #chat { height: 400px; overflow-y: auto; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 15px; background: #0a0a0a; border-radius: 4px; }
+        #status-bar { 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            background: var(--bg-card); 
+            border-left: 6px solid var(--status-warn); 
+            font-weight: bold; 
+            color: var(--status-warn); 
+            border-radius: 4px; 
+            transition: all 0.2s ease; 
+        }
+        .panel { 
+            background: var(--bg-card); 
+            border: 1px solid var(--border-color); 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin-bottom: 15px; 
+        }
+        #chat { 
+            height: 400px; 
+            overflow-y: auto; 
+            border: 1px solid var(--border-color); 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            background: #0a0a0a; 
+            border-radius: 4px; 
+        }
         .input-group { display: flex; gap: 10px; }
-        #input { flex: 1; padding: 12px; background: #252525; color: #fff; border: 1px solid var(--border-color); border-radius: 4px; font-size: 16px; }
+        #input { 
+            flex: 1; 
+            padding: 12px; 
+            background: #252525; 
+            color: #fff; 
+            border: 1px solid var(--border-color); 
+            border-radius: 4px; 
+            font-size: 16px; 
+        }
         #input:disabled { opacity: 0.5; cursor: not-allowed; }
-        button { padding: 12px 24px; background: var(--accent); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 16px; transition: background 0.2s; }
+        button { 
+            padding: 12px 24px; 
+            background: var(--accent); 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            font-size: 16px; 
+            transition: background 0.2s; 
+        }
         button:disabled { background: #444; color: #888; cursor: not-allowed; }
-        .error-log { color: var(--status-err); background: rgba(255, 77, 77, 0.08); border: 1px solid rgba(255, 77, 77, 0.3); padding: 12px; border-radius: 4px; margin-top: 12px; font-family: monospace; display: none; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+        .error-log { 
+            color: var(--status-err); 
+            background: rgba(255, 77, 77, 0.08); 
+            border: 1px solid rgba(255, 77, 77, 0.3); 
+            padding: 12px; 
+            border-radius: 4px; 
+            margin-top: 12px; 
+            font-family: monospace; 
+            display: none; 
+            font-size: 13px; 
+            white-space: pre-wrap; 
+            word-break: break-all; 
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>Assistente IA Offline (Gemma-4 LiteRT)</h2>
+    <h2>Assistente IA Offline (Gemma-4 E4B LiteRT)</h2>
     
-    <div id="status-bar">Status: Analisando subsistema WebGPU do navegador...</div>
+    <div id="status-bar">Status: Executando análises preliminares de hardware...</div>
 
     <div class="panel">
-        <label style="font-weight: bold; display: block; margin-bottom: 10px;">Carregar Gemma-4 Local (.task):</label>
+        <label style="font-weight: bold; display: block; margin-bottom: 10px;">Carga do Modelo Local (.task):</label>
         <input type="file" id="modelFile" accept=".task" autocomplete="off" disabled>
         <div id="log-panel" class="error-log"></div>
     </div>
 
-    <div id="chat">Aguardando validação das APIs de hardware...</div>
+    <div id="chat">Aguardando a validação do ambiente de runtime...</div>
     
     <div class="input-group">
-        <input type="text" id="input" placeholder="Aguardando ativação do LiteRT..." disabled autocomplete="off">
+        <input type="text" id="input" placeholder="Aguardando ativação do modelo..." disabled autocomplete="off">
         <button id="send" disabled>Enviar</button>
     </div>
 </div>
 
 <script type="module">
-    // Polyfills de estabilização da API WebGPU para navegadores atualizados
+    // =========================================================================
+    // PROTOCOLO DE INTERCEPTAÇÃO E COMPATIBILIDADE WEBGPU (CHROME/EDGE/OPERA 2026)
+    // =========================================================================
     if (typeof GPUAdapter !== 'undefined' && !GPUAdapter.prototype.requestAdapterInfo) {
         GPUAdapter.prototype.requestAdapterInfo = async function() {
-            return this.info;
+            return this.info || { device: "Mapeador Genérico WebGPU", architecture: "Desconhecida" };
         };
     }
 
     if (typeof GPUDevice !== 'undefined') {
         Object.defineProperty(GPUDevice.prototype, 'adapterInfo', {
-            get() { return this._shadowAdapterInfo || this.info || {}; },
-            set(value) { this._shadowAdapterInfo = value; },
+            get() {
+                return this._shadowAdapterInfo || this.info || { device: "Mapeador Genérico WebGPU" };
+            },
+            set(value) {
+                this._shadowAdapterInfo = value;
+            },
             configurable: true
         });
     }
+    // =========================================================================
 
     const statusBar = document.getElementById('status-bar');
     const fileInput = document.getElementById('modelFile');
@@ -79,15 +145,15 @@
         statusBar.style.color = "var(--status-err)";
         statusBar.innerText = `Erro Fatal: ${title}`;
         logPanel.style.display = "block";
-        logPanel.innerText = `[EXCEÇÃO TRATADA]\nOrigem: ${title}\nMensagem: ${exception.message || exception}\nStack: ${exception.stack || 'Nenhum'}\nTimestamp: ${new Date().toISOString()}`;
+        logPanel.innerText = `[EXCEÇÃO TRATADA]\nOrigem: ${title}\nMensagem: ${exception.message || exception}\nStack: ${exception.stack || 'Nenhum rastreamento'}\nTimestamp: ${new Date().toISOString()}`;
     }
 
     if (!navigator.gpu) {
         emitFatalError(
-            "WebGPU Ausente", 
-            "Seu navegador não expõe suporte a WebGPU. Ative a aceleração de hardware nas configurações."
+            "API WebGPU Indisponível", 
+            "O navegador atual não expõe o subsistema WebGPU. Ative a aceleração por hardware nas configurações do navegador."
         );
-        chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro Crítico:</b> O modelo Gemma-4 exige alocação de tensores via WebGPU.</p>`;
+        chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Falha Crítica:</b> A arquitetura local do Gemma-4 necessita obrigatoriamente de WebGPU ativa.</p>`;
     } else {
         initializeApplication();
     }
@@ -95,74 +161,80 @@
     async function initializeApplication() {
         let FilesetResolver, LlmInference;
         try {
-            statusBar.innerText = "Status: Vinculando motor LiteRT de IA local...";
+            statusBar.innerText = "Status: Carregando motor de inferência local...";
             
-            // Importa o script local index.js atualizado para o escopo do LiteRT
-            const liteRtGlue = await import('./index.js');
-            FilesetResolver = liteRtGlue.FilesetResolver;
-            LlmInference = liteRtGlue.LlmInference;
+            const mediaPipeGlue = await import('./index.js');
+            FilesetResolver = mediaPipeGlue.FilesetResolver;
+            LlmInference = mediaPipeGlue.LlmInference;
             
         } catch (err) {
-            emitFatalError("Falha ao ler arquivos locais", err);
-            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro:</b> Não foi possível carregar o arquivo ./index.js local.</p>`;
+            emitFatalError("Falha ao carregar scripts locais", err);
+            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Inicialização:</b> Não foi possível ler o arquivo ./index.js local no GitHub Pages.</p>`;
             return;
         }
 
         if (!FilesetResolver || !LlmInference) {
-            emitFatalError("Mapeamento Inválido", new Error("Componentes do motor LiteRT ausentes no index.js."));
+            emitFatalError("Mapeamento Inválido", new Error("Objetos de inicialização ausentes dentro do index.js."));
             return;
         }
         
         statusBar.style.borderLeftColor = "var(--status-warn)";
         statusBar.style.color = "var(--status-warn)";
-        statusBar.innerText = "Status: Motor LiteRT pronto. Aguardando arquivo .task...";
-        chatDiv.innerHTML = "<p><b>Sistema:</b> Pronto para receber o modelo Gemma-4. Selecione o arquivo `.task` para injetar os pesos.</p>";
+        statusBar.innerText = "Status: Módulos prontos. Aguardando arquivo Gemma-4 (.task)...";
+        chatDiv.innerHTML = "<p><b>Sistema:</b> Pronto para carga de arquivos virtuais. Insira o modelo Gemma-4 baixado do LiteRT.</p>";
         fileInput.disabled = false;
         
         setupFileListener(FilesetResolver, LlmInference);
     }
 
     function setupFileListener(FilesetResolver, LlmInference) {
-        let llmInferenceInstance;
+        let llmInferenceInstance = null;
 
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
+            if (file.size === 0) {
+                emitFatalError("Buffer Nulo", new Error("O arquivo selecionado possui 0 bytes ou está corrompido."));
+                fileInput.value = '';
+                return;
+            }
+
             try {
                 fileInput.disabled = true;
                 logPanel.style.display = "none";
-                statusBar.innerText = `Status: Mapeando stream do arquivo "${file.name}"...`;
-                chatDiv.innerHTML = "<p><i>Mapeando ponteiro de arquivo virtual (Blob streaming)...</i></p>";
+                statusBar.innerText = `Status: Indexando ponteiro de "${file.name}"...`;
+                chatDiv.innerHTML = "<p><i>Mapeando fluxo virtual de tensores (Blob streaming)...</i></p>";
                 
                 await new Promise(resolve => setTimeout(resolve, 100));
                 const modelUrl = URL.createObjectURL(file);
 
-                statusBar.innerText = "Status: Carregando binários WebAssembly LiteRT locais (/wasm)...";
+                statusBar.innerText = "Status: Vinculando binários WebAssembly locais (.wasm)...";
                 await new Promise(resolve => setTimeout(resolve, 60));
 
-                const liteRtFileset = await FilesetResolver.forGenAiTasks('./wasm');
+                const genAiFileset = await FilesetResolver.forGenAiTasks('./wasm');
 
-                statusBar.innerText = "Status: Alocando grafo e compilando tensores Gemma-4 na WebGPU...";
+                statusBar.innerText = "Status: Alocando tensores Gemma-4 e compilando shaders WebGPU...";
                 await new Promise(resolve => setTimeout(resolve, 60));
 
-                // Configuração otimizada para o layout de tensores do Gemma-4 E4B
-                llmInferenceInstance = await LlmInference.createFromOptions(liteRtFileset, {
+                // Configurações específicas para evitar estouro de dimensões de grafos do LiteRT
+                llmInferenceInstance = await LlmInference.createFromOptions(genAiFileset, {
                     baseOptions: { modelAssetPath: modelUrl },
-                    maxTokens: 2048,
-                    topK: 40,
-                    temperature: 0.7
+                    maxTokens: 1024,
+                    topK: 30,
+                    temperature: 0.6,
+                    randomSeed: Math.floor(Math.random() * 1000)
                 });
 
                 statusBar.style.borderLeftColor = "var(--status-ok)";
                 statusBar.style.color = "var(--status-ok)";
-                statusBar.innerText = "Status: Inferência do LiteRT Ativa.";
-                chatDiv.innerHTML = "<p style='color:var(--status-ok);'><b>Sistema:</b> Concluído. Os tensores do Gemma-4 estão carregados na memória local da sua GPU.</p>";
+                statusBar.innerText = "Status: Pipeline de Inferência Concluído.";
+                chatDiv.innerHTML = "<p style='color:var(--status-ok);'><b>Sistema:</b> Ligação estrita concluída. O modelo Gemma-4 está alocado na sua VRAM local. Você pode desconectar a internet.</p>";
                 
                 const activeInput = document.getElementById('input');
                 const activeSend = document.getElementById('send');
                 
-                activeInput.placeholder = "Pergunte algo ao Gemma-4...";
+                activeInput.placeholder = "Pergunte algo ao Gemma-4 local...";
                 activeInput.disabled = false;
                 activeSend.disabled = false;
                 activeInput.focus();
@@ -172,8 +244,8 @@
             } catch (error) {
                 fileInput.disabled = false;
                 fileInput.value = '';
-                emitFatalError("Falha na Inicialização do Grafo LiteRT", error);
-                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Pipeline:</b> Incompatibilidade crítica de tensores. Confirme se o arquivo selecionado é o gemma-4-E4B-it-web.task oficial.</p>`;
+                emitFatalError("Falha Crítica na Alocação das Camadas do Modelo", error);
+                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Grafo:</b> O tamanho ou a assinatura das matrizes de pesos do arquivo difere do esperado pelo módulo WASM atual. Certifique-se de usar uma versão compatível do index.js ou use um modelo estável.</p>`;
             }
         });
     }
@@ -202,7 +274,8 @@
                 
                 const fullResponse = await llmInference.generateResponse(prompt, (partialText, isComplete) => {
                     streamingTriggered = true;
-                    responseWrapper.innerHTML = `<b>IA:</b> ${partialText}`;
+                    // Filtra marcações estranhas residuais da compilação do tokenizador
+                    responseWrapper.innerHTML = `<b>IA:</b> ${partialText.replace(/<br>/g, '\n')}`;
                     chatDiv.scrollTop = chatDiv.scrollHeight;
 
                     if (isComplete) {
@@ -220,22 +293,28 @@
                     currentInput.focus();
                 }
             } catch (runtimeError) {
-                responseWrapper.innerHTML = `<b>IA:</b> <span style="color:var(--status-err);"><br>[Erro de Inferência]: ${runtimeError.message}</span>`;
+                responseWrapper.innerHTML = `<b>IA:</b> <span style="color:var(--status-err);"><br>[Erro Crítico de Execução]: ${runtimeError.message}</span>`;
                 currentInput.disabled = false;
                 currentSend.disabled = false;
                 currentInput.focus();
             }
         }
 
-        sendBtn.replaceWith(sendBtn.cloneNode(true));
-        inputEl.replaceWith(inputEl.cloneNode(true));
+        const currentSendBtn = document.getElementById('send');
+        const currentInputEl = document.getElementById('input');
 
-        document.getElementById('send').addEventListener('click', runPipeline);
-        document.getElementById('input').addEventListener('keypress', (e) => { if (e.key === 'Enter') runPipeline(); });
+        currentSendBtn.replaceWith(currentSendBtn.cloneNode(true));
+        currentInputEl.replaceWith(currentInputEl.cloneNode(true));
+
+        const newSendBtn = document.getElementById('send');
+        const newInputEl = document.getElementById('input');
+
+        newSendBtn.addEventListener('click', runPipeline);
+        newInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') runPipeline(); });
     }
 
     window.addEventListener('unhandledrejection', (e) => {
-        emitFatalError("Rejeição Assíncrona Global", e.reason);
+        emitFatalError("Rejeição Global Não Capturada", e.reason);
     });
 </script>
 </body>
