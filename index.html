@@ -72,34 +72,34 @@
     if (!navigator.gpu) {
         emitFatalError(
             "API WebGPU Indisponível", 
-            "O navegador atual não expõe o subsistema WebGPU. Verifique se: 1. Está utilizando Chrome/Edge v113+. 2. A aceleração de hardware está ativa no navegador. 3. Os drivers da GPU estão atualizados."
+            "O navegador atual não expõe o subsistema WebGPU. Verifique se: 1. Está utilizando Chrome/Edge v113+. 2. A aceleração de hardware está active no navegador. 3. Os drivers da GPU estão atualizados."
         );
         chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Falha Crítica de Hardware:</b> A arquitetura de tensores locais do MediaPipe GenAI necessita obrigatoriamente de WebGPU ativa no host.</p>`;
     } else {
-        // Camada 2: Importação Isolada Dinâmica para Resiliência de Script
+        // Camada 2: Inicialização Local da Aplicação
         initializeApplication();
     }
 
-  async function initializeApplication() {
+    async function initializeApplication() {
         let FilesetResolver, LlmInference;
         try {
-            statusBar.innerText = "Status: Importando interpretadores consolidados via esm.sh...";
+            statusBar.innerText = "Status: Carregando motor de IA local...";
             
-            // O esm.sh resolve nativamente todos os sub-imports e dependências do MediaPipe para o navegador
-            const mediaPipeGlue = await import('https://esm.sh/@google/mediapipe-tasks-genai@0.10.14');
+            // Importação do arquivo local index.js unificado na raiz do seu GitHub
+            const mediaPipeGlue = await import('./index.js');
             
             FilesetResolver = mediaPipeGlue.FilesetResolver;
             LlmInference = mediaPipeGlue.LlmInference;
             
         } catch (err) {
-            emitFatalError("Falha Crítica de Resolução no CDN esm.sh", err);
-            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Inicialização:</b> O motor do MediaPipe não pôde ser estruturado pelo CDN. Verifique sua conexão de rede ou permissões de script.</p>`;
+            emitFatalError("Falha ao carregar scripts locais", err);
+            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Inicialização:</b> Não foi possível ler o arquivo ./index.js. Verifique se ele foi enviado corretamente para o repositório.</p>`;
             return;
         }
 
         // Validação das propriedades centrais de inferência
         if (!FilesetResolver || !LlmInference) {
-            emitFatalError("Mapeamento de Escopo Inválido", new Error("O script foi baixado, mas os objetos FilesetResolver ou LlmInference estão ausentes no export."));
+            emitFatalError("Mapeamento de Escopo Inválido", new Error("O script local foi baixado, mas os objetos FilesetResolver ou LlmInference estão ausentes."));
             return;
         }
         
@@ -112,20 +112,6 @@
         setupFileListener(FilesetResolver, LlmInference);
     }
 
-        // Validação estrutural pós-carregamento
-        if (!FilesetResolver || !LlmInference) {
-            emitFatalError("Mapeamento de Escopo Inválido", new Error("Os scripts foram baixados, mas os pontos de entrada FilesetResolver ou LlmInference não foram expostos."));
-            return;
-        }
-        
-        statusBar.style.borderLeftColor = "var(--status-warn)";
-        statusBar.style.color = "var(--status-warn)";
-        statusBar.innerText = "Status: Módulos prontos. Aguardando injeção do arquivo (.task)...";
-        chatDiv.innerHTML = "<p><b>Sistema:</b> Ambiente inicializado com sucesso via CDN resiliente. Clique em 'Escolher arquivo' para carregar o modelo.</p>";
-        fileInput.disabled = false;
-        
-        setupFileListener(FilesetResolver, LlmInference);
-    }
     function setupFileListener(FilesetResolver, LlmInference) {
         let llmInferenceInstance;
 
@@ -146,17 +132,16 @@
                 statusBar.innerText = `Status: Lendo chunks binários de "${file.name}"...`;
                 chatDiv.innerHTML = "<p><i>Extraindo payload de dados e gerando ArrayBuffer local...</i></p>";
                 
-                await new Promise(resolve => setTimeout(resolve, 120)); // Força ciclo de repintura da UI (Main Thread control)
+                await new Promise(resolve => setTimeout(resolve, 120)); // Força ciclo de repintura da UI
 
                 const arrayBuffer = await file.arrayBuffer();
                 const modelBuffer = new Uint8Array(arrayBuffer);
 
-                statusBar.innerText = "Status: Baixando/Instanciando binários auxiliares WebAssembly (.wasm)...";
+                statusBar.innerText = "Status: Vinculando binários auxiliares WebAssembly locais (.wasm)...";
                 await new Promise(resolve => setTimeout(resolve, 60));
 
-                const genAiFileset = await FilesetResolver.forGenAiTasks(
-                    'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/wasm'
-                );
+                // Redirecionamento estrito para buscar os binários WebAssembly na sua pasta local /wasm
+                const genAiFileset = await FilesetResolver.forGenAiTasks('./wasm');
 
                 statusBar.innerText = "Status: Alocando tensores e compilando shaders na WebGPU (VRAM)...";
                 await new Promise(resolve => setTimeout(resolve, 60));
@@ -184,7 +169,7 @@
                 fileInput.disabled = false;
                 fileInput.value = '';
                 emitFatalError("Falha na Instanciação do Grafo de Inferência", error);
-                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Pipeline:</b> A injeção de tensores falhou. Isto ocorre devido a falta de VRAM livre no dispositivo ou desalinhamento estrutural do arquivo .task.</p>`;
+                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Pipeline:</b> A injeção de tensores falhou. Isto ocorre devido a falta de VRAM livre no dispositivo ou desalinhamento estrutural dos arquivos na pasta ./wasm.</p>`;
             }
         });
     }
