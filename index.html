@@ -80,15 +80,28 @@
         initializeApplication();
     }
 
-    async function initializeApplication() {
+   async function initializeApplication() {
         let FilesetResolver, LlmInference;
         try {
             statusBar.innerText = "Status: Importando interpretadores nativos do CDN estável...";
             
-            
-            const mediaPipeGlue = await import('https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/genai_bundle.js');
-            FilesetResolver = mediaPipeGlue.FilesetResolver;
-            LlmInference = mediaPipeGlue.LlmInference;
+            // Injeção dinâmica de script clássico para compatibilidade com o bundle UMD
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/genai_bundle.js';
+                script.crossOrigin = 'anonymous';
+                script.onload = resolve;
+                script.onerror = () => reject(new Error("Não foi possível baixar o binário genai_bundle.js do CDN."));
+                document.head.appendChild(script);
+            });
+
+            // Resgata as classes injetadas diretamente no escopo global do navegador
+            FilesetResolver = window.FilesetResolver;
+            LlmInference = window.LlmInference;
+
+            if (!FilesetResolver || !LlmInference) {
+                throw new Error("Script carregado, mas as referências globais do MediaPipe não foram localizadas.");
+            }
             
             statusBar.style.borderLeftColor = "var(--status-warn)";
             statusBar.style.color = "var(--status-warn)";
@@ -99,7 +112,7 @@
             setupFileListener(FilesetResolver, LlmInference);
         } catch (err) {
             emitFatalError("Falha de Resolução de Dependência Externa", err);
-            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Rede/Compilação:</b> Ocorreu uma interrupção ao processar a biblioteca principal do MediaPipe. Certifique-se de possuir conectividade ativa no primeiro carregamento (warm-up do cache PWA).</p>`;
+            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Rede/Compilação:</b> Ocorreu uma interrupção ao processar a biblioteca principal do MediaPipe. Certifique-se de possuir conectividade ativa no primeiro carregamento.</p>`;
         }
     }
 
