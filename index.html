@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v5.1 Assistente IA Offline (Gemma-4)</title>
+    <title>v5.2 Assistente IA Offline (Gemma-4)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -57,7 +57,6 @@
     const inputEl = document.getElementById('input');
     const sendBtn = document.getElementById('send');
 
-    // Sanitização de persistência colateral de formulário do navegador
     fileInput.value = '';
 
     function emitFatalError(title, exception) {
@@ -68,15 +67,13 @@
         logPanel.innerText = `[EXCEÇÃO TRATADA]\nOrigem: ${title}\nMensagem: ${exception.message || exception}\nStack: ${exception.stack || 'Nenhum rastreamento disponível'}\nTimestamp: ${new Date().toISOString()}`;
     }
 
-    // Camada 1: Auditoria de Subsistema Gráfico (WebGPU)
     if (!navigator.gpu) {
         emitFatalError(
             "API WebGPU Indisponível", 
-            "O navegador atual não expõe o subsistema WebGPU. Verifique se: 1. Está utilizando Chrome/Edge v113+. 2. A aceleração de hardware está active no navegador. 3. Os drivers da GPU estão atualizados."
+            "O navegador atual não expõe o subsistema WebGPU. Verifique se a aceleração de hardware está ativa."
         );
         chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Falha Crítica de Hardware:</b> A arquitetura de tensores locais do MediaPipe GenAI necessita obrigatoriamente de WebGPU ativa no host.</p>`;
     } else {
-        // Camada 2: Inicialização Local da Aplicação
         initializeApplication();
     }
 
@@ -85,28 +82,25 @@
         try {
             statusBar.innerText = "Status: Carregando motor de IA local...";
             
-            // Importação do arquivo local index.js unificado na raiz do seu GitHub
             const mediaPipeGlue = await import('./index.js');
-            
             FilesetResolver = mediaPipeGlue.FilesetResolver;
             LlmInference = mediaPipeGlue.LlmInference;
             
         } catch (err) {
             emitFatalError("Falha ao carregar scripts locais", err);
-            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Inicialização:</b> Não foi possível ler o arquivo ./index.js. Verifique se ele foi enviado corretamente para o repositório.</p>`;
+            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Inicialização:</b> Não foi possível ler o arquivo ./index.js local.</p>`;
             return;
         }
 
-        // Validação das propriedades centrais de inferência
         if (!FilesetResolver || !LlmInference) {
-            emitFatalError("Mapeamento de Escopo Inválido", new Error("O script local foi baixado, mas os objetos FilesetResolver ou LlmInference estão ausentes."));
+            emitFatalError("Mapeamento de Escopo Inválido", new Error("Objetos FilesetResolver ou LlmInference ausentes."));
             return;
         }
         
         statusBar.style.borderLeftColor = "var(--status-warn)";
         statusBar.style.color = "var(--status-warn)";
         statusBar.innerText = "Status: Módulos prontos. Aguardando injeção do arquivo (.task)...";
-        chatDiv.innerHTML = "<p><b>Sistema:</b> Ambiente inicializado com sucesso. Clique em 'Escolher arquivo' para mapear o seu modelo local na memória do interpretador.</p>";
+        chatDiv.innerHTML = "<p><b>Sistema:</b> Ambiente inicializado com sucesso. Clique em 'Escolher arquivo' para carregar o modelo.</p>";
         fileInput.disabled = false;
         
         setupFileListener(FilesetResolver, LlmInference);
@@ -119,9 +113,8 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            // Camada 3: Validação Volumétrica Preventiva
             if (file.size === 0) {
-                emitFatalError("Buffer de Arquivo Corrompido", new Error("O arquivo selecionado possui comprimento estrito de 0 bytes. Download incompleto."));
+                emitFatalError("Buffer de Arquivo Corrompido", new Error("O arquivo selecionado possui 0 bytes."));
                 fileInput.value = '';
                 return;
             }
@@ -129,25 +122,25 @@
             try {
                 fileInput.disabled = true;
                 logPanel.style.display = "none";
-                statusBar.innerText = `Status: Lendo chunks binários de "${file.name}"...`;
-                chatDiv.innerHTML = "<p><i>Extraindo payload de dados e gerando ArrayBuffer local...</i></p>";
+                statusBar.innerText = `Status: Vinculando fluxo de "${file.name}"...`;
+                chatDiv.innerHTML = "<p><i>Mapeando ponteiro de arquivo virtual (Blob streaming)...</i></p>";
                 
-                await new Promise(resolve => setTimeout(resolve, 120)); // Força ciclo de repintura da UI
+                await new Promise(resolve => setTimeout(resolve, 100));
 
-                const arrayBuffer = await file.arrayBuffer();
-                const modelBuffer = new Uint8Array(arrayBuffer);
+                // CORREÇÃO ESSENCIAL: Cria link direto para o arquivo físico sem estourar a RAM do JS
+                const modelUrl = URL.createObjectURL(file);
 
                 statusBar.innerText = "Status: Vinculando binários auxiliares WebAssembly locais (.wasm)...";
                 await new Promise(resolve => setTimeout(resolve, 60));
 
-                // Redirecionamento estrito para buscar os binários WebAssembly na sua pasta local /wasm
                 const genAiFileset = await FilesetResolver.forGenAiTasks('./wasm');
 
                 statusBar.innerText = "Status: Alocando tensores e compilando shaders na WebGPU (VRAM)...";
                 await new Promise(resolve => setTimeout(resolve, 60));
 
+                // Mudamos de modelAssetBuffer para modelAssetPath consumindo a URL criada
                 llmInferenceInstance = await LlmInference.createFromOptions(genAiFileset, {
-                    baseOptions: { modelAssetBuffer: modelBuffer },
+                    baseOptions: { modelAssetPath: modelUrl },
                     maxTokens: 2048,
                     topK: 40,
                     temperature: 0.7
@@ -156,7 +149,7 @@
                 statusBar.style.borderLeftColor = "var(--status-ok)";
                 statusBar.style.color = "var(--status-ok)";
                 statusBar.innerText = "Status: Sistema de Inferência Ativo e Prontificado.";
-                chatDiv.innerHTML = "<p style='color:var(--status-ok);'><b>Sistema:</b> Ligação estrita concluída. O modelo está hospedado em sua GPU local. Barramento de rede liberado para desconexão total.</p>";
+                chatDiv.innerHTML = "<p style='color:var(--status-ok);'><b>Sistema:</b> Ligação estrita concluída. O modelo está hospedado na sua GPU local. Você pode se desconectar da internet.</p>";
                 
                 inputEl.placeholder = "Digite sua mensagem e pressione Enter...";
                 inputEl.disabled = false;
@@ -169,7 +162,7 @@
                 fileInput.disabled = false;
                 fileInput.value = '';
                 emitFatalError("Falha na Instanciação do Grafo de Inferência", error);
-                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Pipeline:</b> A injeção de tensores falhou. Isto ocorre devido a falta de VRAM livre no dispositivo ou desalinhamento estrutural dos arquivos na pasta ./wasm.</p>`;
+                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Pipeline:</b> A injeção de tensores falhou. Garanta que o arquivo selecionado é um modelo válido compatível com o MediaPipe GenAI Tasks e que há VRAM disponível.</p>`;
             }
         });
     }
@@ -219,7 +212,6 @@
         newInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') runPipeline(); });
     }
 
-    // Monitoramento reativo global para falhas assíncronas externas (unhandled rejections)
     window.addEventListener('unhandledrejection', (e) => {
         emitFatalError("Rejeição Assíncrona Não Tratada no Loop Global", e.reason);
     });
