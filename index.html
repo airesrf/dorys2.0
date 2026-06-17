@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v5.2 Assistente IA Offline (Gemma-4)</title>
+    <title>v5.3 Assistente IA Offline (Gemma-4)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -50,6 +50,16 @@
 </div>
 
 <script type="module">
+    // =========================================================================
+    // POLYFILL ESSENCIAL: Correção para a depreciação do WebGPU em navegadores modernos
+    // =========================================================================
+    if (typeof GPUAdapter !== 'undefined' && !GPUAdapter.prototype.requestAdapterInfo) {
+        GPUAdapter.prototype.requestAdapterInfo = async function() {
+            return this.info; // Redireciona a chamada antiga para o mapeamento síncrono moderno
+        };
+    }
+    // =========================================================================
+
     const statusBar = document.getElementById('status-bar');
     const fileInput = document.getElementById('modelFile');
     const logPanel = document.getElementById('log-panel');
@@ -126,8 +136,6 @@
                 chatDiv.innerHTML = "<p><i>Mapeando ponteiro de arquivo virtual (Blob streaming)...</i></p>";
                 
                 await new Promise(resolve => setTimeout(resolve, 100));
-
-                // CORREÇÃO ESSENCIAL: Cria link direto para o arquivo físico sem estourar a RAM do JS
                 const modelUrl = URL.createObjectURL(file);
 
                 statusBar.innerText = "Status: Vinculando binários auxiliares WebAssembly locais (.wasm)...";
@@ -138,7 +146,6 @@
                 statusBar.innerText = "Status: Alocando tensores e compilando shaders na WebGPU (VRAM)...";
                 await new Promise(resolve => setTimeout(resolve, 60));
 
-                // Mudamos de modelAssetBuffer para modelAssetPath consumindo a URL criada
                 llmInferenceInstance = await LlmInference.createFromOptions(genAiFileset, {
                     baseOptions: { modelAssetPath: modelUrl },
                     maxTokens: 2048,
