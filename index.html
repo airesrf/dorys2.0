@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente IA Offline (Gemma-4)</title>
+    <title>v2.0 Assistente IA Offline (Gemma-4)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -85,7 +85,8 @@
         try {
             statusBar.innerText = "Status: Importando interpretadores nativos do CDN estável...";
             
-            const mediaPipeGlue = await import('https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/+esm');
+            
+            const mediaPipeGlue = await import('https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/genai_bundle.js');
             FilesetResolver = mediaPipeGlue.FilesetResolver;
             LlmInference = mediaPipeGlue.LlmInference;
             
