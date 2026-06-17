@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v4.0 Assistente IA Offline (Gemma-4)</title>
+    <title>v5.0 Assistente IA Offline (Gemma-4)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -80,30 +80,37 @@
         initializeApplication();
     }
 
-   async function initializeApplication() {
+  async function initializeApplication() {
         let FilesetResolver, LlmInference;
-        statusBar.innerText = "Status: Importando interpretadores nativos via canais redundantes...";
-        
-        // Rota Principal: Provedor jsDelivr com resolução automática de módulo
         try {
-            const mediaPipeGlue = await import('https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14');
+            statusBar.innerText = "Status: Importando interpretadores consolidados via esm.sh...";
+            
+            // O esm.sh resolve nativamente todos os sub-imports e dependências do MediaPipe para o navegador
+            const mediaPipeGlue = await import('https://esm.sh/@google/mediapipe-tasks-genai@0.10.14');
+            
             FilesetResolver = mediaPipeGlue.FilesetResolver;
             LlmInference = mediaPipeGlue.LlmInference;
-        } catch (primaryErr) {
-            // Rota de Contingência: Provedor unpkg caso o primeiro falhe ou bloqueie
-            try {
-                const mediaPipeGlueFallback = await import('https://unpkg.com/@google/mediapipe-tasks-genai@0.10.14');
-                FilesetResolver = mediaPipeGlueFallback.FilesetResolver;
-                LlmInference = mediaPipeGlueFallback.LlmInference;
-            } catch (secondaryErr) {
-                emitFatalError(
-                    "Falha Crítica de Rede em Todos os CDNs", 
-                    new Error(`jsDelivr indisponível (${primaryErr.message}) e unpkg indisponível (${secondaryErr.message}).`)
-                );
-                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Conectividade:</b> Não foi possível carregar os motores de IA de nenhum provedor global. Verifique se há bloqueios de firewall na rede.</p>`;
-                return;
-            }
+            
+        } catch (err) {
+            emitFatalError("Falha Crítica de Resolução no CDN esm.sh", err);
+            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Inicialização:</b> O motor do MediaPipe não pôde ser estruturado pelo CDN. Verifique sua conexão de rede ou permissões de script.</p>`;
+            return;
         }
+
+        // Validação das propriedades centrais de inferência
+        if (!FilesetResolver || !LlmInference) {
+            emitFatalError("Mapeamento de Escopo Inválido", new Error("O script foi baixado, mas os objetos FilesetResolver ou LlmInference estão ausentes no export."));
+            return;
+        }
+        
+        statusBar.style.borderLeftColor = "var(--status-warn)";
+        statusBar.style.color = "var(--status-warn)";
+        statusBar.innerText = "Status: Módulos prontos. Aguardando injeção do arquivo (.task)...";
+        chatDiv.innerHTML = "<p><b>Sistema:</b> Ambiente inicializado com sucesso. Clique em 'Escolher arquivo' para mapear o seu modelo local na memória do interpretador.</p>";
+        fileInput.disabled = false;
+        
+        setupFileListener(FilesetResolver, LlmInference);
+    }
 
         // Validação estrutural pós-carregamento
         if (!FilesetResolver || !LlmInference) {
