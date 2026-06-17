@@ -2,150 +2,218 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>v1.0 - Assistente Local LiteRT - Dorys / MediaPipe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente IA Offline (Gemma-4)</title>
+    <link rel="manifest" href="manifest.json">
     <style>
-        body { font-family: Arial, sans-serif; background: #1e1e1e; color: #fff; padding: 20px; }
-        #status-bar { padding: 12px; margin-bottom: 15px; background: #2a2a2a; border-left: 5px solid #ffa500; font-weight: bold; color: #ffa500; }
-        #chat { height: 350px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 10px; background: #121212; }
-        #input { width: 75%; padding: 10px; background: #333; color: #fff; border: 1px solid #555; }
-        button { padding: 10px 20px; background: #007acc; color: white; border: none; cursor: pointer; }
-        button:disabled, input:disabled { background: #555; cursor: not-allowed; }
-        .setup { margin-bottom: 20px; padding: 10px; background: #2a2a2a; border-radius: 5px; }
+        :root {
+            --bg-main: #121212;
+            --bg-card: #1e1e1e;
+            --border-color: #333;
+            --text-main: #e0e0e0;
+            --accent: #007acc;
+            --status-warn: #ffa500;
+            --status-err: #ff4d4d;
+            --status-ok: #00e676;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-main); color: var(--text-main); padding: 20px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; }
+        #status-bar { padding: 15px; margin-bottom: 15px; background: var(--bg-card); border-left: 6px solid var(--status-warn); font-weight: bold; color: var(--status-warn); border-radius: 4px; transition: all 0.2s ease; }
+        .panel { background: var(--bg-card); border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        #chat { height: 400px; overflow-y: auto; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 15px; background: #0a0a0a; border-radius: 4px; }
+        .input-group { display: flex; gap: 10px; }
+        #input { flex: 1; padding: 12px; background: #252525; color: #fff; border: 1px solid var(--border-color); border-radius: 4px; font-size: 16px; }
+        #input:disabled { opacity: 0.5; cursor: not-allowed; }
+        button { padding: 12px 24px; background: var(--accent); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 16px; transition: background 0.2s; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        .error-log { color: var(--status-err); background: rgba(255, 77, 77, 0.08); border: 1px solid rgba(255, 77, 77, 0.3); padding: 12px; border-radius: 4px; margin-top: 12px; font-family: monospace; display: none; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
     </style>
 </head>
 <body>
-
+<div class="container">
     <h2>Assistente IA Offline (Gemma-4)</h2>
     
-    <div id="status-bar">Status: Inicializando módulos do sistema...</div>
+    <div id="status-bar">Status: Executando análises preliminares de hardware...</div>
 
-    <div class="setup">
-        <label>Selecione o arquivo do seu PC:</label><br><br>
-        <input type="file" id="modelFile" accept=".task">
+    <div class="panel">
+        <label style="font-weight: bold; display: block; margin-bottom: 10px;">Carga do Modelo Local (.task):</label>
+        <input type="file" id="modelFile" accept=".task" autocomplete="off" disabled>
+        <div id="log-panel" class="error-log"></div>
     </div>
 
-    <div id="chat">Nenhum modelo carregado no momento.</div>
-    <input type="text" id="input" placeholder="Digite sua mensagem..." disabled>
-    <button id="send" disabled>Enviar</button>
+    <div id="chat">Aguardando a validação do ambiente de runtime...</div>
+    
+    <div class="input-group">
+        <input type="text" id="input" placeholder="Aguardando ativação do modelo..." disabled autocomplete="off">
+        <button id="send" disabled>Enviar</button>
+    </div>
+</div>
 
-    <script>
-        window.addEventListener('error', function(e) {
-            const status = document.getElementById('status-bar');
-            status.style.borderLeftColor = "#ff0000";
-            status.style.color = "#ff0000";
-            status.innerText = "Erro crítico de carregamento: " + e.message;
-        });
-        window.addEventListener('unhandledrejection', function(e) {
-            const status = document.getElementById('status-bar');
-            status.style.borderLeftColor = "#ff0000";
-            status.style.color = "#ff0000";
-            status.innerText = "Erro na Promessa: " + e.reason;
-        });
-    </script>
+<script type="module">
+    const statusBar = document.getElementById('status-bar');
+    const fileInput = document.getElementById('modelFile');
+    const logPanel = document.getElementById('log-panel');
+    const chatDiv = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
 
-    <script type="module">
-        // Correção da URL com compilador integrado ESM do CDN para evitar rejeição do navegador
-        import { FilesetResolver, LlmInference } from 'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/+esm';
+    // Sanitização de persistência colateral de formulário do navegador
+    fileInput.value = '';
 
-        const fileInput = document.getElementById('modelFile');
-        const statusBar = document.getElementById('status-bar');
-        const chatDiv = document.getElementById('chat');
-        const inputEl = document.getElementById('input');
-        const sendBtn = document.getElementById('send');
-        let llmInference;
+    function emitFatalError(title, exception) {
+        statusBar.style.borderLeftColor = "var(--status-err)";
+        statusBar.style.color = "var(--status-err)";
+        statusBar.innerText = `Erro Fatal: ${title}`;
+        logPanel.style.display = "block";
+        logPanel.innerText = `[EXCEÇÃO TRATADA]\nOrigem: ${title}\nMensagem: ${exception.message || exception}\nStack: ${exception.stack || 'Nenhum rastreamento disponível'}\nTimestamp: ${new Date().toISOString()}`;
+    }
 
-        // Indica que o motor JavaScript carregou com sucesso e aguarda a ação
-        statusBar.innerText = "Status: Pronto para receber o arquivo do modelo (.task).";
+    // Camada 1: Auditoria de Subsistema Gráfico (WebGPU)
+    if (!navigator.gpu) {
+        emitFatalError(
+            "API WebGPU Indisponível", 
+            "O navegador atual não expõe o subsistema WebGPU. Verifique se: 1. Está utilizando Chrome/Edge v113+. 2. A aceleração de hardware está ativa no navegador. 3. Os drivers da GPU estão atualizados."
+        );
+        chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Falha Crítica de Hardware:</b> A arquitetura de tensores locais do MediaPipe GenAI necessita obrigatoriamente de WebGPU ativa no host.</p>`;
+    } else {
+        // Camada 2: Importação Isolada Dinâmica para Resiliência de Script
+        initializeApplication();
+    }
+
+    async function initializeApplication() {
+        let FilesetResolver, LlmInference;
+        try {
+            statusBar.innerText = "Status: Importando interpretadores nativos do CDN estável...";
+            
+            const mediaPipeGlue = await import('https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/+esm');
+            FilesetResolver = mediaPipeGlue.FilesetResolver;
+            LlmInference = mediaPipeGlue.LlmInference;
+            
+            statusBar.style.borderLeftColor = "var(--status-warn)";
+            statusBar.style.color = "var(--status-warn)";
+            statusBar.innerText = "Status: Módulos prontos. Aguardando injeção do arquivo (.task)...";
+            chatDiv.innerHTML = "<p><b>Sistema:</b> Ambiente inicializado com sucesso. Clique em 'Escolher arquivo' para mapear o seu modelo local na memória do interpretador.</p>";
+            fileInput.disabled = false;
+            
+            setupFileListener(FilesetResolver, LlmInference);
+        } catch (err) {
+            emitFatalError("Falha de Resolução de Dependência Externa", err);
+            chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Rede/Compilação:</b> Ocorreu uma interrupção ao processar a biblioteca principal do MediaPipe. Certifique-se de possuir conectividade ativa no primeiro carregamento (warm-up do cache PWA).</p>`;
+        }
+    }
+
+    function setupFileListener(FilesetResolver, LlmInference) {
+        let llmInferenceInstance;
 
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Altera a interface imediatamente
-            fileInput.disabled = true;
-            statusBar.style.borderLeftColor = "#ffa500";
-            statusBar.style.color = "#ffa500";
-            statusBar.innerText = `Status: Extraindo e alocando bytes de "${file.name}"...`;
-            chatDiv.innerHTML = "<p><i>Processando arquivo local... Objeto pesado detectado.</i></p>";
-
-            // Pequena folga assíncrona para forçar o navegador a renderizar o texto acima antes do congelamento físico da leitura
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Camada 3: Validação Volumétrica Preventiva
+            if (file.size === 0) {
+                emitFatalError("Buffer de Arquivo Corrompido", new Error("O arquivo selecionado possui comprimento estrito de 0 bytes. Download incompleto."));
+                fileInput.value = '';
+                return;
+            }
 
             try {
-                // Etapa pesada: Processamento de dados binários do modelo
+                fileInput.disabled = true;
+                logPanel.style.display = "none";
+                statusBar.innerText = `Status: Lendo chunks binários de "${file.name}"...`;
+                chatDiv.innerHTML = "<p><i>Extraindo payload de dados e gerando ArrayBuffer local...</i></p>";
+                
+                await new Promise(resolve => setTimeout(resolve, 120)); // Força ciclo de repintura da UI (Main Thread control)
+
                 const arrayBuffer = await file.arrayBuffer();
                 const modelBuffer = new Uint8Array(arrayBuffer);
-                
-                statusBar.innerText = "Status: Binários prontos. Carregando interpretadores WebAssembly...";
-                await new Promise(resolve => setTimeout(resolve, 50));
+
+                statusBar.innerText = "Status: Baixando/Instanciando binários auxiliares WebAssembly (.wasm)...";
+                await new Promise(resolve => setTimeout(resolve, 60));
 
                 const genAiFileset = await FilesetResolver.forGenAiTasks(
                     'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/wasm'
                 );
 
-                statusBar.innerText = "Status: Configurando tensores e injetando parâmetros na WebGPU...";
-                await new Promise(resolve => setTimeout(resolve, 50));
+                statusBar.innerText = "Status: Alocando tensores e compilando shaders na WebGPU (VRAM)...";
+                await new Promise(resolve => setTimeout(resolve, 60));
 
-                llmInference = await LlmInference.createFromOptions(genAiFileset, {
+                llmInferenceInstance = await LlmInference.createFromOptions(genAiFileset, {
                     baseOptions: { modelAssetBuffer: modelBuffer },
                     maxTokens: 2048,
                     topK: 40,
                     temperature: 0.7
                 });
 
-                statusBar.style.borderLeftColor = "#00ff00";
-                statusBar.style.color = "#00ff00";
-                statusBar.innerText = "Status: Concluído! Modelo carregado com sucesso na GPU local.";
-                chatDiv.innerHTML = "<p style='color:#00ff00;'><b>Sistema:</b> Chat ativado. Toda a inferência ocorrerá estritamente no seu hardware.</p>";
+                statusBar.style.borderLeftColor = "var(--status-ok)";
+                statusBar.style.color = "var(--status-ok)";
+                statusBar.innerText = "Status: Sistema de Inferência Ativo e Prontificado.";
+                chatDiv.innerHTML = "<p style='color:var(--status-ok);'><b>Sistema:</b> Ligação estrita concluída. O modelo está hospedado em sua GPU local. Barramento de rede liberado para desconexão total.</p>";
                 
+                inputEl.placeholder = "Digite sua mensagem e pressione Enter...";
                 inputEl.disabled = false;
                 sendBtn.disabled = false;
                 inputEl.focus();
 
+                setupChatEngine(llmInferenceInstance);
+
             } catch (error) {
-                statusBar.style.borderLeftColor = "#ff0000";
-                statusBar.style.color = "#ff0000";
-                statusBar.innerText = "Status: Erro interno de alocação.";
-                chatDiv.innerHTML = `<p style="color:red"><b>Falha no motor:</b> ${error.message}</p>`;
                 fileInput.disabled = false;
+                fileInput.value = '';
+                emitFatalError("Falha na Instanciação do Grafo de Inferência", error);
+                chatDiv.innerHTML = `<p style="color:var(--status-err)"><b>Erro de Pipeline:</b> A injeção de tensores falhou. Isto ocorre devido a falta de VRAM livre no dispositivo ou desalinhamento estrutural do arquivo .task.</p>`;
             }
         });
+    }
 
-        async function sendMessage() {
-            const text = inputEl.value.trim();
-            if (!text || !llmInference) return;
+    function setupChatEngine(llmInference) {
+        async function runPipeline() {
+            const prompt = inputEl.value.trim();
+            if (!prompt) return;
 
-            chatDiv.innerHTML += `<p><b>Você:</b> ${text}</p>`;
+            chatDiv.innerHTML += `<p><b>Você:</b> ${prompt}</p>`;
             inputEl.value = '';
 
-            const responseDiv = document.createElement('p');
-            responseDiv.innerHTML = '<b>IA:</b> ';
-            chatDiv.appendChild(responseDiv);
+            const responseWrapper = document.createElement('p');
+            responseWrapper.innerHTML = '<b>IA:</b> ';
+            chatDiv.appendChild(responseWrapper);
             chatDiv.scrollTop = chatDiv.scrollHeight;
 
             inputEl.disabled = true;
             sendBtn.disabled = true;
 
             try {
-                await llmInference.generateResponse(text, (partialText, done) => {
-                    responseDiv.innerHTML = `<b>IA:</b> ${partialText}`;
+                await llmInference.generateResponse(prompt, (partialText, isComplete) => {
+                    responseWrapper.innerHTML = `<b>IA:</b> ${partialText}`;
                     chatDiv.scrollTop = chatDiv.scrollHeight;
 
-                    if (done) {
+                    if (isComplete) {
                         inputEl.disabled = false;
                         sendBtn.disabled = false;
                         inputEl.focus();
                     }
                 });
-            } catch (error) {
-                responseDiv.innerHTML += `<span style="color:red;"><br>Erro na geração: ${error.message}</span>`;
+            } catch (runtimeError) {
+                responseWrapper.innerHTML += `<span style="color:var(--status-err);"><br>[Erro Crítico de Runtime]: ${runtimeError.message}</span>`;
                 inputEl.disabled = false;
                 sendBtn.disabled = false;
+                inputEl.focus();
             }
         }
 
-        sendBtn.addEventListener('click', sendMessage);
-        inputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-    </script>
+        sendBtn.replaceWith(sendBtn.cloneNode(true));
+        inputEl.replaceWith(inputEl.cloneNode(true));
+
+        const newSendBtn = document.getElementById('send');
+        const newInputEl = document.getElementById('input');
+
+        newSendBtn.addEventListener('click', runPipeline);
+        newInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') runPipeline(); });
+    }
+
+    // Monitoramento reativo global para falhas assíncronas externas (unhandled rejections)
+    window.addEventListener('unhandledrejection', (e) => {
+        emitFatalError("Rejeição Assíncrona Não Tratada no Loop Global", e.reason);
+    });
+</script>
 </body>
 </html>
