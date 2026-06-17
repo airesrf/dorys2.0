@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Assistente Local LiteRT / MediaPipe</title>
+    <title>Assistente Local LiteRT - Dorys / MediaPipe</title>
     <style>
         body { font-family: Arial, sans-serif; background: #1e1e1e; color: #fff; padding: 20px; }
         #status-bar { padding: 12px; margin-bottom: 15px; background: #2a2a2a; border-left: 5px solid #ffa500; font-weight: bold; color: #ffa500; }
@@ -17,7 +17,7 @@
 
     <h2>Assistente IA Offline (Gemma-4)</h2>
     
-    <div id="status-bar">Status: Verificando compatibilidade do navegador...</div>
+    <div id="status-bar">Status: Inicializando módulos do sistema...</div>
 
     <div class="setup">
         <label>Selecione o arquivo do seu PC:</label><br><br>
@@ -33,16 +33,19 @@
             const status = document.getElementById('status-bar');
             status.style.borderLeftColor = "#ff0000";
             status.style.color = "#ff0000";
-            if (window.location.protocol === 'file:') {
-                status.innerText = "Erro: O arquivo foi aberto via 'file://'. Você precisa rodar um servidor local (localhost).";
-            } else {
-                status.innerText = "Erro de Script: " + e.message;
-            }
+            status.innerText = "Erro crítico de carregamento: " + e.message;
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const status = document.getElementById('status-bar');
+            status.style.borderLeftColor = "#ff0000";
+            status.style.color = "#ff0000";
+            status.innerText = "Erro na Promessa: " + e.reason;
         });
     </script>
 
     <script type="module">
-        import { FilesetResolver, LlmInference } from 'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14';
+        // Correção da URL com compilador integrado ESM do CDN para evitar rejeição do navegador
+        import { FilesetResolver, LlmInference } from 'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/+esm';
 
         const fileInput = document.getElementById('modelFile');
         const statusBar = document.getElementById('status-bar');
@@ -51,33 +54,37 @@
         const sendBtn = document.getElementById('send');
         let llmInference;
 
-        // Atualiza o status inicial se o ambiente estiver correto
-        if (window.location.protocol !== 'file:') {
-            statusBar.innerText = "Status: Pronto para receber o arquivo do modelo (.task).";
-        }
+        // Indica que o motor JavaScript carregou com sucesso e aguarda a ação
+        statusBar.innerText = "Status: Pronto para receber o arquivo do modelo (.task).";
 
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Feedback visual imediato ao clicar
+            // Altera a interface imediatamente
             fileInput.disabled = true;
             statusBar.style.borderLeftColor = "#ffa500";
             statusBar.style.color = "#ffa500";
-            statusBar.innerText = `Status: Extraindo bytes de "${file.name}"...`;
-            chatDiv.innerHTML = "<p><i>Processando arquivo local...</i></p>";
+            statusBar.innerText = `Status: Extraindo e alocando bytes de "${file.name}"...`;
+            chatDiv.innerHTML = "<p><i>Processando arquivo local... Objeto pesado detectado.</i></p>";
+
+            // Pequena folga assíncrona para forçar o navegador a renderizar o texto acima antes do congelamento físico da leitura
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             try {
+                // Etapa pesada: Processamento de dados binários do modelo
                 const arrayBuffer = await file.arrayBuffer();
                 const modelBuffer = new Uint8Array(arrayBuffer);
                 
-                statusBar.innerText = "Status: Carregando dependências WebAssembly da Google (WASM)...";
+                statusBar.innerText = "Status: Binários prontos. Carregando interpretadores WebAssembly...";
+                await new Promise(resolve => setTimeout(resolve, 50));
 
                 const genAiFileset = await FilesetResolver.forGenAiTasks(
                     'https://cdn.jsdelivr.net/npm/@google/mediapipe-tasks-genai@0.10.14/wasm'
                 );
 
-                statusBar.innerText = "Status: Inicializando a WebGPU e alocando o modelo na placa de vídeo...";
+                statusBar.innerText = "Status: Configurando tensores e injetando parâmetros na WebGPU...";
+                await new Promise(resolve => setTimeout(resolve, 50));
 
                 llmInference = await LlmInference.createFromOptions(genAiFileset, {
                     baseOptions: { modelAssetBuffer: modelBuffer },
@@ -88,8 +95,8 @@
 
                 statusBar.style.borderLeftColor = "#00ff00";
                 statusBar.style.color = "#00ff00";
-                statusBar.innerText = "Status: Pronto! IA carregada com sucesso. Você pode desconectar a internet.";
-                chatDiv.innerHTML = "<p style='color:#00ff00;'><b>Sistema:</b> Modelo pronto para uso local.</p>";
+                statusBar.innerText = "Status: Concluído! Modelo carregado com sucesso na GPU local.";
+                chatDiv.innerHTML = "<p style='color:#00ff00;'><b>Sistema:</b> Chat ativado. Toda a inferência ocorrerá estritamente no seu hardware.</p>";
                 
                 inputEl.disabled = false;
                 sendBtn.disabled = false;
@@ -98,9 +105,8 @@
             } catch (error) {
                 statusBar.style.borderLeftColor = "#ff0000";
                 statusBar.style.color = "#ff0000";
-                statusBar.innerText = "Status: Falha ao alocar o modelo.";
-                chatDiv.innerHTML = `<p style="color:red"><b>Erro na inicialização:</b> ${error.message}<br><br>
-                <i>Nota: Se o erro mencionar 'WebGPU', verifique se o seu navegador está com a aceleração de hardware ativa nas configurações.</i></p>`;
+                statusBar.innerText = "Status: Erro interno de alocação.";
+                chatDiv.innerHTML = `<p style="color:red"><b>Falha no motor:</b> ${error.message}</p>`;
                 fileInput.disabled = false;
             }
         });
