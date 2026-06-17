@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v5.3 Assistente IA Offline (Gemma-4)</title>
+    <title>v5.4 Assistente IA Offline (Gemma-4)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -51,12 +51,24 @@
 
 <script type="module">
     // =========================================================================
-    // POLYFILL ESSENCIAL: Correção para a depreciação do WebGPU em navegadores modernos
+    // CORREÇÃO DOS DOIS NÍVEIS DE DEPRECIAÇÃO DA WEBGPU (COMPATIBILIDADE CHROME/EDGE)
     // =========================================================================
     if (typeof GPUAdapter !== 'undefined' && !GPUAdapter.prototype.requestAdapterInfo) {
         GPUAdapter.prototype.requestAdapterInfo = async function() {
-            return this.info; // Redireciona a chamada antiga para o mapeamento síncrono moderno
+            return this.info;
         };
+    }
+
+    if (typeof GPUDevice !== 'undefined') {
+        Object.defineProperty(GPUDevice.prototype, 'adapterInfo', {
+            get() {
+                return this._shadowAdapterInfo || this.info || {};
+            },
+            set(value) {
+                this._shadowAdapterInfo = value;
+            },
+            configurable: true
+        });
     }
     // =========================================================================
 
