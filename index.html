@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v5.41 Assistente IA Offline (Gemma-4)</title>
+    <title>v5.5 Assistente IA Offline (Gemma-4)</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -50,9 +50,7 @@
 </div>
 
 <script type="module">
-    // =========================================================================
-    // CORREÇÃO DOS DOIS NÍVEIS DE DEPRECIAÇÃO DA WEBGPU (COMPATIBILIDADE CHROME/EDGE)
-    // =========================================================================
+    // Correção de compatibilidade com a especificação atual da WebGPU nos navegadores modernos
     if (typeof GPUAdapter !== 'undefined' && !GPUAdapter.prototype.requestAdapterInfo) {
         GPUAdapter.prototype.requestAdapterInfo = async function() {
             return this.info;
@@ -70,7 +68,6 @@
             configurable: true
         });
     }
-    // =========================================================================
 
     const statusBar = document.getElementById('status-bar');
     const fileInput = document.getElementById('modelFile');
@@ -170,10 +167,13 @@
                 statusBar.innerText = "Status: Sistema de Inferência Ativo e Prontificado.";
                 chatDiv.innerHTML = "<p style='color:var(--status-ok);'><b>Sistema:</b> Ligação estrita concluída. O modelo está hospedado na sua GPU local. Você pode se desconectar da internet.</p>";
                 
-                inputEl.placeholder = "Digite sua mensagem e pressione Enter...";
-                inputEl.disabled = false;
-                sendBtn.disabled = false;
-                inputEl.focus();
+                const activeInput = document.getElementById('input');
+                const activeSend = document.getElementById('send');
+                
+                activeInput.placeholder = "Digite sua mensagem e pressione Enter...";
+                activeInput.disabled = false;
+                activeSend.disabled = false;
+                activeInput.focus();
 
                 setupChatEngine(llmInferenceInstance);
 
@@ -188,39 +188,57 @@
 
     function setupChatEngine(llmInference) {
         async function runPipeline() {
-            const prompt = inputEl.value.trim();
+            // Busca os elementos ativos no DOM para evitar leitura de nós órfãos clonados
+            const currentInput = document.getElementById('input');
+            const currentSend = document.getElementById('send');
+            
+            const prompt = currentInput.value.trim();
             if (!prompt) return;
 
             chatDiv.innerHTML += `<p><b>Você:</b> ${prompt}</p>`;
-            inputEl.value = '';
+            currentInput.value = '';
 
             const responseWrapper = document.createElement('p');
-            responseWrapper.innerHTML = '<b>IA:</b> ';
+            responseWrapper.innerHTML = '<b>IA:</b> <i>Processando tensores locais...</i>';
             chatDiv.appendChild(responseWrapper);
             chatDiv.scrollTop = chatDiv.scrollHeight;
 
-            inputEl.disabled = true;
-            sendBtn.disabled = true;
+            currentInput.disabled = true;
+            currentSend.disabled = true;
 
             try {
-                await llmInference.generateResponse(prompt, (partialText, isComplete) => {
+                let streamingTriggered = false;
+                
+                // Chamada do pipeline local passando o callback de progresso por token
+                const fullResponse = await llmInference.generateResponse(prompt, (partialText, isComplete) => {
+                    streamingTriggered = true;
                     responseWrapper.innerHTML = `<b>IA:</b> ${partialText}`;
                     chatDiv.scrollTop = chatDiv.scrollHeight;
 
                     if (isComplete) {
-                        inputEl.disabled = false;
-                        sendBtn.disabled = false;
-                        inputEl.focus();
+                        currentInput.disabled = false;
+                        currentSend.disabled = false;
+                        currentInput.focus();
                     }
                 });
+
+                // Fallback de segurança: Se o build do MediaPipe ignorar o callback e retornar a string cheia via Promise
+                if (!streamingTriggered && fullResponse) {
+                    responseWrapper.innerHTML = `<b>IA:</b> ${fullResponse}`;
+                    chatDiv.scrollTop = chatDiv.scrollHeight;
+                    currentInput.disabled = false;
+                    currentSend.disabled = false;
+                    currentInput.focus();
+                }
             } catch (runtimeError) {
-                responseWrapper.innerHTML += `<span style="color:var(--status-err);"><br>[Erro Crítico de Runtime]: ${runtimeError.message}</span>`;
-                inputEl.disabled = false;
-                sendBtn.disabled = false;
-                inputEl.focus();
+                responseWrapper.innerHTML = `<b>IA:</b> <span style="color:var(--status-err);"><br>[Erro Crítico de Inferência]: ${runtimeError.message}</span>`;
+                currentInput.disabled = false;
+                currentSend.disabled = false;
+                currentInput.focus();
             }
         }
 
+        // Limpeza estrutural de listeners antigos via clonagem
         sendBtn.replaceWith(sendBtn.cloneNode(true));
         inputEl.replaceWith(inputEl.cloneNode(true));
 
